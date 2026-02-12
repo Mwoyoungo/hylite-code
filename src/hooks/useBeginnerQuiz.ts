@@ -77,16 +77,26 @@ export function useBeginnerQuiz({
 
       const parsed = await res.json() as QuizQuestion;
 
-      // Parse test case inputs/outputs
-      parsed.testCases = parsed.testCases.map((tc, i) => ({
-        ...tc,
-        id: tc.id || String(i + 1),
-        isHidden: tc.isHidden ?? false,
-        input: typeof tc.input === 'string' ? JSON.parse(tc.input as string) : tc.input,
-        expectedOutput: typeof tc.expectedOutput === 'string'
-          ? JSON.parse(tc.expectedOutput as string)
-          : tc.expectedOutput,
-      }));
+      // Parse test case inputs/outputs — safely handle strings that aren't valid JSON
+      parsed.testCases = parsed.testCases.map((tc, i) => {
+        let input = tc.input;
+        let expectedOutput = tc.expectedOutput;
+
+        if (typeof input === 'string') {
+          try { input = JSON.parse(input as string); } catch { /* use as-is */ }
+        }
+        if (typeof expectedOutput === 'string') {
+          try { expectedOutput = JSON.parse(expectedOutput as string); } catch { /* use as-is */ }
+        }
+
+        return {
+          ...tc,
+          id: tc.id || String(i + 1),
+          isHidden: tc.isHidden ?? false,
+          input,
+          expectedOutput,
+        };
+      });
 
       setCurrentQuestion(parsed);
       setCode(`// Write your solution here\nfunction ${parsed.functionName}() {\n  \n}\n`);
