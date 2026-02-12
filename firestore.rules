@@ -1,0 +1,107 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ─────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerId) {
+      return request.auth.uid == ownerId;
+    }
+
+    // ─────────────────────────────────────────
+    // PDFs
+    // ─────────────────────────────────────────
+    match /pdfs/{pdfId} {
+      // Any authenticated user can read PDFs
+      allow read: if isAuth();
+
+      // Any authenticated user can create a PDF
+      allow create: if isAuth()
+        && request.resource.data.uploadedBy == request.auth.uid;
+
+      // Only uploader can update/delete
+      allow update, delete: if isAuth()
+        && isOwner(resource.data.uploadedBy);
+
+      // ─── Audio Rooms (subcollection)
+      match /audio_rooms/{roomId} {
+        allow read: if isAuth();
+
+        allow create: if isAuth()
+          && request.resource.data.creatorId == request.auth.uid;
+
+        // Creator can update/delete their room
+        allow update, delete: if isAuth()
+          && isOwner(resource.data.creatorId);
+      }
+
+      // ─── Highlights (subcollection)
+      match /highlights/{highlightId} {
+        allow read: if isAuth();
+
+        allow create: if isAuth()
+          && request.resource.data.userId == request.auth.uid;
+
+        allow update, delete: if isAuth()
+          && isOwner(resource.data.userId);
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // Quantum Quiz AI
+    // ─────────────────────────────────────────
+    match /quiz_topics/{topicId} {
+      allow read: if isAuth();
+      allow write: if true;
+    }
+
+    match /quiz_problems/{problemId} {
+      allow read: if isAuth();
+      allow write: if true;
+    }
+
+    match /quiz_users/{userId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.auth.uid == userId;
+      allow update: if isAuth() && request.auth.uid == userId;
+    }
+
+    match /quiz_sessions/{sessionId} {
+      allow read, write: if isAuth();
+
+      match /messages/{messageId} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // Beginner Mode
+    // ─────────────────────────────────────────
+    match /beginner_topics/{topicId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    match /beginner_sessions/{sessionId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+    }
+
+    match /calls/{callId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+    }
+
+    match /tutor_availability/{tutorId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+    }
+  }
+}
