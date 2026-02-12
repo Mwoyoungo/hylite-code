@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
+import { verifyAuth } from '@/lib/firebase/verify-auth';
 
 export async function POST(req: NextRequest) {
+  // Verify authentication
+  const authResult = await verifyAuth(req);
+  if (authResult instanceof NextResponse) return authResult;
+
   try {
     const { roomName, participantName, participantIdentity } = await req.json();
 
@@ -9,6 +14,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
+      );
+    }
+
+    // Ensure participant identity matches authenticated user
+    if (participantIdentity !== authResult.uid) {
+      return NextResponse.json(
+        { error: 'Participant identity does not match authenticated user' },
+        { status: 403 }
       );
     }
 

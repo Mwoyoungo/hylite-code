@@ -11,9 +11,18 @@ interface UseCallStateOptions {
   onAccepted?: () => void;
   onDeclined?: () => void;
   onMissed?: () => void;
+  onCancelled?: () => void;
+  onEnded?: (endedBy: string) => void;
 }
 
-export function useCallState({ callId, onAccepted, onDeclined, onMissed }: UseCallStateOptions) {
+export function useCallState({
+  callId,
+  onAccepted,
+  onDeclined,
+  onMissed,
+  onCancelled,
+  onEnded,
+}: UseCallStateOptions) {
   const [callStatus, setCallStatus] = useState<CallStatus | null>(null);
   const [callData, setCallData] = useState<CallDocument | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -27,9 +36,18 @@ export function useCallState({ callId, onAccepted, onDeclined, onMissed }: UseCa
         setCallData(data);
         setCallStatus(data.status);
 
-        if (data.status === 'accepted') onAccepted?.();
+        if (data.status === 'accepted') {
+          // Clear auto-miss timeout once accepted
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          onAccepted?.();
+        }
         if (data.status === 'declined') onDeclined?.();
         if (data.status === 'missed') onMissed?.();
+        if (data.status === 'cancelled') onCancelled?.();
+        if (data.status === 'ended') onEnded?.(data.endedBy || '');
       }
     });
 
@@ -44,12 +62,21 @@ export function useCallState({ callId, onAccepted, onDeclined, onMissed }: UseCa
       unsub();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [callId, onAccepted, onDeclined, onMissed]);
+  }, [callId, onAccepted, onDeclined, onMissed, onCancelled, onEnded]);
 
   const cancelCall = useCallback(async () => {
     if (!callId) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     await updateCall(callId, { status: 'cancelled' } as Partial<CallDocument>);
+  }, [callId]);
+
+  const endCall = useCallback(async (userId: string) => {
+    if (!callId) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    await updateCall(callId, {
+      status: 'ended',
+      endedBy: userId,
+    } as Partial<CallDocument>);
   }, [callId]);
 
   const acceptCall = useCallback(async (call: CallDocument) => {
@@ -65,6 +92,7 @@ export function useCallState({ callId, onAccepted, onDeclined, onMissed }: UseCa
     callStatus,
     callData,
     cancelCall,
+    endCall,
     acceptCall,
     declineCall,
   };

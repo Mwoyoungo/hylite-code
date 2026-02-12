@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { editor as MonacoEditorType } from 'monaco-editor';
 import { Loader2, AlertTriangle } from 'lucide-react';
+import { getAuthHeaders } from '@/lib/firebase/get-auth-header';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -49,9 +50,10 @@ export default function CollaborativeCodeEditor({
     let cancelled = false;
     async function checkLiveblocks() {
       try {
+        const headers = await getAuthHeaders();
         const res = await fetch('/api/liveblocks/auth', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ userId, userName, roomId }),
         });
         if (cancelled) return;
@@ -85,9 +87,10 @@ export default function CollaborativeCodeEditor({
 
       const client = createClient({
         authEndpoint: async () => {
+          const headers = await getAuthHeaders();
           const res = await fetch('/api/liveblocks/auth', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ userId, userName, roomId }),
           });
           const data = await res.json();

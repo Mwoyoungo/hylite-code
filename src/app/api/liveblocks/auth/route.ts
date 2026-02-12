@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Liveblocks } from '@liveblocks/node';
+import { verifyAuth } from '@/lib/firebase/verify-auth';
 
 let _liveblocks: Liveblocks | null = null;
 
@@ -15,6 +16,10 @@ function getLiveblocks(): Liveblocks {
 }
 
 export async function POST(req: NextRequest) {
+  // Verify authentication
+  const authResult = await verifyAuth(req);
+  if (authResult instanceof NextResponse) return authResult;
+
   try {
     const { userId, userName, roomId } = await req.json();
 
@@ -22,6 +27,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
+      );
+    }
+
+    // Ensure userId matches authenticated user
+    if (userId !== authResult.uid) {
+      return NextResponse.json(
+        { error: 'User ID does not match authenticated user' },
+        { status: 403 }
       );
     }
 

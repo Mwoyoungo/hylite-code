@@ -21,7 +21,9 @@ import {
   getBeginnerSession,
   updateBeginnerSession,
   completeBeginnerTopic,
+  updateCall,
 } from '@/lib/firebase/firestore';
+import { getAuthHeaders } from '@/lib/firebase/get-auth-header';
 import { Loader2, Rocket, AlertTriangle } from 'lucide-react';
 import type { BeginnerSession, BeginnerTopic, CallDocument, ChatMessage } from '@/lib/types';
 
@@ -107,9 +109,10 @@ export default function SessionPage() {
     }
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/livekit/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           roomName: session.livekitRoom,
           participantName: profile?.displayName || 'User',
@@ -135,14 +138,7 @@ export default function SessionPage() {
     // Stay on page, CallingOverlay will show missed state
   }, []);
 
-  const { callStatus, cancelCall } = useCallState({
-    callId,
-    onAccepted: handleCallAccepted,
-    onDeclined: handleCallDeclined,
-    onMissed: handleCallMissed,
-  });
-
-  // ─── LiveKit audio ──────────────────────────────────
+  // ─── LiveKit audio (declared before call state handlers that need lkDisconnect) ──
   const {
     connected: lkConnected,
     isMuted,
@@ -155,9 +151,64 @@ export default function SessionPage() {
     autoConnect: true,
   });
 
-  const handleEndCall = useCallback(() => {
+  const handleCallEnded = useCallback((endedBy: string) => {
     lkDisconnect();
-  }, [lkDisconnect]);
+    if (endedBy !== user?.uid) {
+      router.replace(`/beginner/${topicId}`);
+    }
+  }, [lkDisconnect, user, router, topicId]);
+
+  const handleCallCancelled = useCallback(() => {
+    lkDisconnect();
+    router.replace(`/beginner/${topicId}`);
+  }, [lkDisconnect, router, topicId]);
+
+  const { callStatus, cancelCall, endCall } = useCallState({
+    callId,
+    onAccepted: handleCallAccepted,
+    onDeclined: handleCallDeclined,
+    onMissed: handleCallMissed,
+    onEnded: handleCallEnded,
+    onCancelled: handleCallCancelled,
+  });
+
+  const handleEndCall = useCallback(async () => {
+    lkDisconnect();
+    if (callId && user) {
+      try {
+        await endCall(user.uid);
+      } catch (err) {
+        console.error('Failed to update call status:', err);
+      }
+    }
+  }, [lkDisconnect, callId, user, endCall]);
+
+  // ─── Reconnect on refresh: if teaching but no token ─
+  useEffect(() => {
+    if (!session || !user || !profile || !livekitConfigured) return;
+    if (session.status === 'teaching' && !livekitToken) {
+      (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch('/api/livekit/token', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              roomName: session.livekitRoom,
+              participantName: profile.displayName || 'User',
+              participantIdentity: user.uid,
+            }),
+          });
+          const data = await res.json();
+          if (data.token) {
+            setLivekitToken(data.token);
+          }
+        } catch (err) {
+          console.error('Failed to reconnect LiveKit:', err);
+        }
+      })();
+    }
+  }, [session?.status, session?.livekitRoom, user, profile, livekitToken, livekitConfigured]);
 
   // ─── Tutor: Start quiz ─────────────────────────────
   const handleStartQuiz = useCallback(async () => {
@@ -281,7 +332,14 @@ export default function SessionPage() {
                 Audio not configured — use an external voice call. Set LIVEKIT env vars to enable.
               </span>
             </div>
-          ) : null}
+          ) : (
+            <div className="flex items-center gap-2 h-[40px] px-4 bg-accent/10 border-b border-accent/20 flex-shrink-0">
+              <Loader2 size={14} className="text-accent animate-spin" />
+              <span className="text-[12px] font-mono text-accent">
+                Reconnecting to call...
+              </span>
+            </div>
+          )}
 
           <SplitPanel
             left={

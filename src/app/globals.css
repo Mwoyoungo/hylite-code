@@ -123,6 +123,32 @@
   100% { background-position: 200% 0; }
 }
 
+@keyframes splash-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes splash-text-glow {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(0, 122, 204, 0.3), 0 0 40px rgba(78, 201, 176, 0.15);
+  }
+  50% {
+    text-shadow: 0 0 30px rgba(0, 122, 204, 0.5), 0 0 60px rgba(78, 201, 176, 0.3), 0 0 80px rgba(197, 134, 192, 0.15);
+  }
+}
+
+@keyframes splash-fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes splash-underline {
+  0% { transform: scaleX(0); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: #424242 transparent;

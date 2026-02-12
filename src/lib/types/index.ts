@@ -139,7 +139,7 @@ export interface BeginnerQuestion {
   attemptCount: number;
 }
 
-export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'cancelled';
+export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'cancelled' | 'ended';
 
 export interface CallDocument {
   id: string;
@@ -150,6 +150,7 @@ export interface CallDocument {
   status: CallStatus;
   sessionId: string;
   livekitRoom: string;
+  endedBy?: string;
   createdAt: number;
   updatedAt: number;
 }
